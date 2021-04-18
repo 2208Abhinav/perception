@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 import 'package:perception/main.dart';
 import 'package:perception/utils/dimensions.dart';
 
@@ -17,6 +18,8 @@ class _CameraScreenState extends State<CameraScreen> {
   CameraController _controller;
   Uint8List _imageBytes = Uint8List(0);
   double _imageHeightFactor = 0.65;
+
+  double ar = 1;
 
   @override
   void initState() {
@@ -45,6 +48,20 @@ class _CameraScreenState extends State<CameraScreen> {
     //   home: CameraPreview(controller),
     // );
     final double viewportHeight = getViewportHeight(context);
+    double digitFrameHW = 0;
+    double cameraPH = 0;
+    double cameraPW = 0;
+
+    try {
+      digitFrameHW = ((viewportHeight * _imageHeightFactor) /
+              _controller.value.aspectRatio) *
+          0.8;
+      cameraPH = viewportHeight * _imageHeightFactor;
+      cameraPW =
+          (viewportHeight * _imageHeightFactor) / _controller.value.aspectRatio;
+      ar = _controller.value.aspectRatio;
+    } catch (_) {}
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -73,16 +90,31 @@ class _CameraScreenState extends State<CameraScreen> {
                       ),
                       child: Column(
                         children: [
-                          SizedBox(
-                            height: viewportHeight * _imageHeightFactor,
-                            child: _imageBytes.isNotEmpty
-                                ? Container(
-                                    width: (viewportHeight * _imageHeightFactor) / _controller.value.aspectRatio,
-                                    height: viewportHeight * _imageHeightFactor,
-                                    child: Image.memory(_imageBytes),
-                                  )
-                                : CameraPreview(_controller),
-                          ),
+                          _imageBytes.isEmpty
+                              ? SizedBox(
+                                  height: viewportHeight * _imageHeightFactor,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      CameraPreview(_controller),
+                                      Container(
+                                        height: digitFrameHW,
+                                        width: digitFrameHW,
+                                        decoration: BoxDecoration(
+                                          color: Colors.transparent,
+                                          border: Border.all(
+                                            width: 2,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                      )
+                                    ],
+                                  ))
+                              : Container(
+                                  width: digitFrameHW,
+                                  height: digitFrameHW,
+                                  child: Image.memory(_imageBytes),
+                                ),
                           SizedBox(height: 5),
                           Text(
                             'Digit',
@@ -93,7 +125,9 @@ class _CameraScreenState extends State<CameraScreen> {
                       ),
                     ),
                     !_isLoading
-                        ? _imageBytes.isEmpty ? _buildCaptureButton() : _buildClassifyButton()
+                        ? _imageBytes.isEmpty
+                            ? _buildCaptureButton()
+                            : _buildClassifyButton()
                         : CircularProgressIndicator()
                   ],
                 ),
@@ -103,6 +137,7 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Widget _buildCaptureButton() {
+    if (!_controller.value.isInitialized) return CircularProgressIndicator();
     return GestureDetector(
       child: Container(
         height: 56,
@@ -115,15 +150,37 @@ class _CameraScreenState extends State<CameraScreen> {
         ),
       ),
       onTap: () async {
-        setState(() {
-          _isLoading = true;
-        });
-        XFile imageFile = await _controller.takePicture();
-        Uint8List imageBytes = await imageFile.readAsBytes();
-        setState(() {
-          _imageBytes = imageBytes;
-          _isLoading = false;
-        });
+        try {
+          setState(() {
+            _isLoading = true;
+          });
+          XFile imageFile = await _controller.takePicture();
+          Uint8List imageBytes = await imageFile.readAsBytes();
+          img.Image image = img.decodeImage(imageBytes);
+
+          int h1 = image.height.toInt();
+          int w1 = image.width;
+          int h2 = (w1 * 0.8).toInt();
+          int w2 = h2;
+          setState(() {
+            _imageBytes = Uint8List.fromList(
+              img.encodePng(
+                img.copyCrop(
+                  image,
+                  (w1 - w2) ~/ 2,
+                  (h1 - h2) ~/ 2,
+                  w2.toInt(),
+                  h2.toInt(),
+                ),
+              ),
+            );
+            _isLoading = false;
+          });
+        } catch (_) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       },
     );
   }
@@ -134,9 +191,7 @@ class _CameraScreenState extends State<CameraScreen> {
         "Classify",
         style: TextStyle(fontSize: 18),
       ),
-      onPressed: () {
-
-      },
+      onPressed: () {},
     );
   }
 }
