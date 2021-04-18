@@ -1,7 +1,15 @@
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:perception/screens/camera_screen.dart';
 
-void main() {
+List<CameraDescription> cameras;
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  cameras = await availableCameras();
+
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       systemNavigationBarColor: Colors.white,
       statusBarColor: Colors.white,
@@ -22,6 +30,10 @@ class MyApp extends StatelessWidget {
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       home: MyHomePage(title: 'Perception'),
+      routes: <String, WidgetBuilder>{
+        "home": (BuildContext ctx) => MyApp(),
+        "camera_screen": (BuildContext ctx) => CameraScreen(),
+      },
     );
   }
 }
@@ -56,22 +68,20 @@ class _MyHomePageState extends State<MyHomePage> {
               color: Colors.black87,
             ),
             Text(
-              "Scan the image of the digit",
+              "Scan the digit",
               style: TextStyle(
                 color: Colors.black54,
               ),
             ),
             SizedBox(height: 30),
-            RaisedButton(
+            ElevatedButton(
               child: Text(
                 "Scan",
                 style: TextStyle(fontSize: 18),
               ),
-              onPressed: () {},
-              color: Colors.blue,
-              textColor: Colors.white,
-              shape: StadiumBorder(),
-              padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+              onPressed: () {
+                Navigator.pushNamed(context, "camera_screen");
+              },
             )
           ],
         ),
